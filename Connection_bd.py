@@ -1,5 +1,7 @@
 import mysql.connector
 from mysql.connector import errorcode
+from datetime import datetime
+
 
 class Connection_bd:
     def __init__(self, user, password, host, database):
@@ -7,10 +9,11 @@ class Connection_bd:
         self.password = password
         self.host = host
         self.database = database
-        #Alterar plugin de conexão no bando de Dados
-        try :
-            self.cnt = mysql.connector.connect(user = self.user, password = self.password,
-            host = self.host, database = self.database, auth_plugin='mysql_native_password')
+        self.now = now = datetime.now()
+        # Alterar plugin de conexão no bando de Dados
+        try:
+            self.cnt = mysql.connector.connect(user=self.user, password=self.password,
+                                               host=self.host, database=self.database, auth_plugin='mysql_native_password')
         except mysql.connector.Error as err:
             if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
                 print("Something is wrong with your user name or password")
@@ -28,11 +31,11 @@ class Connection_bd:
         '''
         cursor = self.cnt.cursor()
         add_silo = ("INSERT INTO termosilos.silo "
-        "(dsc)"
-        "VALUES (%(descricao)s)")
+                    "(dsc)"
+                    "VALUES (%(descricao)s)")
         for i in silos:
             silo_data = {
-                'descricao' : str(i)
+                'descricao': str(i)
             }
             try:
                 cursor.execute(add_silo, silo_data)
@@ -53,19 +56,22 @@ class Connection_bd:
         cursor = self.cnt.cursor()
         try:
             query = ("SELECT  id_silo, dsc FROM termosilos.silo "
-            "where dsc like %(s)s")
-            inf = {'s' : silo}
+                     "where dsc like %(s)s")
+            inf = {'s': silo}
             cursor.execute(query, inf)
             bd_silos = []
-            for i in cursor: bd_silos.append(i)
+            for i in cursor:
+                bd_silos.append(i)
             if bd_silos == []:
-               raise Exception("Não foi encontrado o silo %s no banco!" % silo)
+                raise Exception(
+                    "Não foi encontrado o silo %s no banco!" % silo)
             elif len(bd_silos) > 1:
-                raise Exception("Mútiplas referências encontradas a %s!"%silo)
+                raise Exception(
+                    "Mútiplas referências encontradas a %s!" % silo)
         except Exception as err:
             print(err)
             cursor.close()
-            return [False,-1]
+            return [False, -1]
         else:
             return [True, bd_silos[0][0]]
 
@@ -82,19 +88,22 @@ class Connection_bd:
         cursor = self.cnt.cursor()
         try:
             query = ("SELECT  * FROM termosilos.pendulo "
-            "WHERE pen_silo = %(silo)s and dsc like %(pendulo)s")
-            inf = {'silo' : silo, 'pendulo' : pendulo}
+                     "WHERE pen_silo = %(silo)s and dsc like %(pendulo)s")
+            inf = {'silo': silo, 'pendulo': pendulo}
             cursor.execute(query, inf)
             bd_pendulos = []
-            for i in cursor: bd_pendulos.append(i)
+            for i in cursor:
+                bd_pendulos.append(i)
             if bd_pendulos == []:
-               raise Exception("Não foi encontrado o pendulo %d no banco!" % pendulo)
+                raise Exception(
+                    "Não foi encontrado o pendulo %d no banco!" % pendulo)
             elif len(bd_pendulos) > 1:
-                raise Exception("Mútiplas referências encontradas a %d!"%pendulo)
+                raise Exception(
+                    "Mútiplas referências encontradas a %d!" % pendulo)
         except Exception as err:
             print(err)
             cursor.close()
-            return [False,-1]
+            return [False, -1]
         else:
             cursor.close()
             return [True, bd_pendulos[0][0]]
@@ -108,13 +117,14 @@ class Connection_bd:
                     descricao do pendulo e a sua identificacao no silo
         '''
         status, pos = self.get_id_silo(silo)
-        if status is False: return
+        if status is False:
+            return
         cursor = self.cnt.cursor()
         add_pendulo = ("INSERT INTO termosilos.pendulo"
-            "(pen_silo, dsc)"
-            "VALUES(%(silo)s, %(pendulo)s)")
+                       "(pen_silo, dsc)"
+                       "VALUES(%(silo)s, %(pendulo)s)")
         for i in pendulos:
-            data_pendulo = {'silo' : pos, 'pendulo' : i}
+            data_pendulo = {'silo': pos, 'pendulo': i}
             cursor.execute(add_pendulo, data_pendulo)
         self.cnt.commit()
         cursor.close()
@@ -130,22 +140,57 @@ class Connection_bd:
                     pendulos e seus respctivos MACS
         '''
         status, id_silo = self.get_id_silo(silo)
-        if status != True: return
+        if status != True:
+            return
         status, id_pendulo = self.get_id_pendulo(id_silo, pendulo)
-        if status != True: return
+        if status != True:
+            return
         cursor = self.cnt.cursor()
         add_sensor = ("INSERT INTO termosilos.sensor "
-        "(pos_sensor, sen_pen, MAC) "
-        "VALUES (%(sensor)s, %(pendulo)s, %(MAC)s)" )
+                      "(pos_sensor, sen_pen, MAC) "
+                      "VALUES (%(sensor)s, %(pendulo)s, %(MAC)s)")
         for i in ad_sensors:
-            data_sensor = {'sensor' : i[0] , 'pendulo' : id_pendulo,
-                'MAC': i[1]}
+            data_sensor = {'sensor': i[0], 'pendulo': id_pendulo,
+                           'MAC': i[1]}
             cursor.execute(add_sensor, data_sensor)
         self.cnt.commit()
         cursor.close()
 
+    def get_id_4_MAC(self, MAC):
+        """
+            Retorna o id do banco so sensor
+            MAC: Endereço do sensor
+        """
+        cursor = self.cnt.cursor()
+        get_sensor = ("select termosilos.sensor.MAC, termosilos.sensor.id_sensor FROM " +
+                      "termosilos.sensor where termosilos.sensor.MAC like %(mac)s;")
+        data_sensor = {
+            'mac': MAC.lower()}
+        cursor.execute(get_sensor, data_sensor)
+        results = cursor.fetchall()[0]
+        cursor.close()
+        return results[1]
+
+    def set_temp_sensor(self, MAC, temperatura):
+        """
+            Coloca as temperaturas no sensor com as datas atuais
+        """
+        cursor = self.cnt.cursor()
+        id_sensor = self.get_id_4_MAC(MAC)
+
+        get_sensor = ("INSERT INTO termosilos.temperatura" +
+                      "(sens_temp, hora, temp)" +
+                      "VALUES(%(id)s, %(date)s, %(temp)s);")
+        data_sensor = {
+            'id': id_sensor,
+            'date': self.now.strftime('%Y-%m-%d %H:%M:%S'),
+            'temp': temperatura}
+        cursor.execute(get_sensor, data_sensor)
+        self.cnt.commit()
+        cursor.close()
+
     def __del__(self):
-        try:    
+        try:
             self.cnt.close()
         except NameError as err:
             print("Banco não definido!\n")

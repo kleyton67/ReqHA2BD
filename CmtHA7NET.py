@@ -38,12 +38,15 @@ class CmtHA7NET(object):
             retorno: temperatura do sensor desejado
         """
         try:
-            req = requests.get("http://"+self.ip+"/1Wire//ReadDS18B20.html?" +
-                "DS18B20Request={"+str((address)+","+str(precision)+"}")
+            req = requests.get("http://"+self.ip+"/1Wire/ReadDS18B20.html?" +
+                               "DS18B20Request={"+str(address)+","+str(precision)+"}")
         except HTTPError as http_err:
             print(f'HTTP error occurred: {http_err}')  # Python 3.6
             return err
         except Exception as err:
             print(f'Other error occurred: {err}')  # Python 3.6
             return err
-        
+        req.encoding = 'utf-8'
+        soup = BS(req.text, 'html.parser')
+        temp_sensor = soup.find("input", id="Temperature_0")
+        return temp_sensor.attrs['value']
